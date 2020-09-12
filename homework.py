@@ -12,7 +12,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 BASE_URL = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
-TIMEOUT = int(os.getenv('TIMEOUT'))
+TIMEOUT = 600
 
 logging.basicConfig()
 log = logging.getLogger('TELEGRAM_BOT_APP')
