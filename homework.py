@@ -14,9 +14,8 @@ CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 BASE_URL = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
 TIMEOUT = 600
 
-logging.basicConfig()
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('TELEGRAM_BOT_APP')
-log.setLevel(logging.INFO)
 
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
@@ -26,15 +25,33 @@ def parse_homework_status(homework):
         return 'Изменился формат API YANDEX PRAKTIKUM'
 
     homework_name = homework['homework_name']
-    if homework['status'] == 'rejected':
+    homework_status = homework['status']
+
+    if homework_status == 'rejected':
         verdict = 'К сожалению в работе нашлись ошибки.'
-    else:
-        verdict = 'Ревьюеру всё понравилось, ' \
+
+    elif homework_status == 'approved':
+        verdict = (
+            'Ревьюеру всё понравилось, ' +
             'можно приступать к следующему уроку.'
+        )
+
+    else:
+        verdict = f'Неизвестный статус: {homework_status}'
+
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
-def get_homework_statuses(current_timestamp):
+def get_homework_statuses(raw_timestamp):
+    try:
+        current_timestamp = int(raw_timestamp)
+        if current_timestamp < 0:
+            raise ValueError
+
+    except ValueError:
+        log.error(f'Timestamp must be int >= 0. {raw_timestamp} given.')
+        current_timestamp = 0
+
     params = {'from_date': current_timestamp}
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -46,11 +63,19 @@ def get_homework_statuses(current_timestamp):
         )
 
     except requests.exceptions.RequestException as e:
-        log.error(f'Request Error: {e}')
-        return None
+        method = e.request.method
+        url = e.request.url
+        headers = e.request.headers
+        log.error(
+            f'Error: {e} during following request:\n' +
+            f'Method: {method}\n' +
+            f'Headers: {headers}\n' +
+            f'Url: {url}'
+        )
 
-    else:
-        return homework_statuses.json()
+        return {}
+
+    return homework_statuses.json()
 
 
 def send_message(message):
@@ -74,17 +99,17 @@ def main():
             new_homework = get_homework_statuses(current_timestamp)
             homeworks = new_homework.get('homeworks')
 
+            if homeworks is None:
+                code = new_homework.get('code')
+                raise Exception(f'{code}')
+
             if homeworks:
                 send_message(
                     parse_homework_status(new_homework.get('homeworks')[0])
                 )
 
-            elif homeworks == []:
-                log.info(f'Try again after {TIMEOUT} seconds.')
-
             else:
-                code = new_homework.get('code')
-                raise Exception(f'{code}')
+                log.info(f'Try again after {TIMEOUT} seconds.')
 
             current_timestamp = new_homework.get('current_date')
             time.sleep(TIMEOUT)
