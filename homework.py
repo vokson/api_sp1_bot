@@ -14,10 +14,19 @@ CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 BASE_URL = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
 TIMEOUT = 600
 
-logging.basicConfig(level=logging.INFO)
+FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(level=logging.INFO, format=FORMAT)
 log = logging.getLogger('TELEGRAM_BOT_APP')
 
 bot = telegram.Bot(token=TELEGRAM_TOKEN)
+
+statuses = {
+    'approved': (
+                    'Ревьюеру всё понравилось, ' +
+                    'можно приступать к следующему уроку.'
+                ),
+    'rejected': 'К сожалению в работе нашлись ошибки.'
+}
 
 
 def parse_homework_status(homework):
@@ -27,16 +36,11 @@ def parse_homework_status(homework):
     homework_name = homework['homework_name']
     homework_status = homework['status']
 
-    if homework_status == 'rejected':
-        verdict = 'К сожалению в работе нашлись ошибки.'
-
-    elif homework_status == 'approved':
-        verdict = (
-            'Ревьюеру всё понравилось, ' +
-            'можно приступать к следующему уроку.'
-        )
+    if homework_status in statuses:
+        verdict = statuses[homework_status]
 
     else:
+        log.error(f'Yandex Praktikum API bad status: {homework_status}')
         verdict = f'Неизвестный статус: {homework_status}'
 
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
@@ -48,9 +52,9 @@ def get_homework_statuses(raw_timestamp):
         if current_timestamp < 0:
             raise ValueError
 
-    except ValueError:
+    except (ValueError, TypeError):
         log.error(f'Timestamp must be int >= 0. {raw_timestamp} given.')
-        current_timestamp = 0
+        current_timestamp = int(time.time())
 
     params = {'from_date': current_timestamp}
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
@@ -81,12 +85,18 @@ def get_homework_statuses(raw_timestamp):
 def send_message(message):
     try:
         response = bot.send_message(CHAT_ID, message)
+
     except telegram.TelegramError as e:
-        log.error(f'Telegram Error: {e}')
+        cleared_message = message.replace('\n', ' ')
+        log.error(
+            f'Error: {e} during message to Telegram:\n' +
+            f'Chat ID: {CHAT_ID}\n' +
+            f'Message: {cleared_message}'
+        )
+
     else:
         log.info(f'Telegram Bot has sent message:\n{response}')
-
-    return response
+        return response
 
 
 def main():
