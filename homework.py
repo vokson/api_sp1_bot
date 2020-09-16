@@ -22,7 +22,7 @@ bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
 statuses = {
     'approved': (
-                    'Ревьюеру всё понравилось, ' +
+                    'Ревьюеру всё понравилось, '
                     'можно приступать к следующему уроку.'
                 ),
     'rejected': 'К сожалению в работе нашлись ошибки.'
@@ -31,6 +31,10 @@ statuses = {
 
 def parse_homework_status(homework):
     if not all([x in homework for x in ['homework_name', 'status']]):
+        log.error(
+            f'Yandex Praktikum API has been changed. "homework_name",'
+            f'or "status" is not in JSON: {homework}'
+        )
         return 'Изменился формат API YANDEX PRAKTIKUM'
 
     homework_name = homework['homework_name']
@@ -38,12 +42,13 @@ def parse_homework_status(homework):
 
     if homework_status in statuses:
         verdict = statuses[homework_status]
+        result = f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
     else:
         log.error(f'Yandex Praktikum API bad status: {homework_status}')
-        verdict = f'Неизвестный статус: {homework_status}'
+        result = f'Неизвестный статус Yandex Praktikum API: {homework_status}'
 
-    return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
+    return result
 
 
 def get_homework_statuses(raw_timestamp):
@@ -93,6 +98,7 @@ def send_message(message):
             f'Chat ID: {CHAT_ID}\n' +
             f'Message: {cleared_message}'
         )
+        return {}
 
     else:
         log.info(f'Telegram Bot has sent message:\n{response}')
